@@ -142,4 +142,8 @@ networks:
 
 volumes:
   mongo_data:
+<<<<<<< HEAD
   shared_uploads:
+=======
+  shared_uploads:
+>>>>>>> df7895084314be6a66783005c97b249199122075
