@@ -1,0 +1,145 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:6.0
+    container_name: food-delivery-mongodb
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - delivery_net
+
+  mongodb-setup:
+    image: mongo:6.0
+    container_name: food-delivery-mongodb-setup
+    depends_on:
+      - mongodb
+    networks:
+      - delivery_net
+    restart: "no"
+    command: >
+      bash -c "
+      echo 'Waiting for MongoDB...' &&
+      until mongosh --host mongodb:27017 --eval 'db.runCommand({ping:1})' &>/dev/null; do sleep 1; done &&
+      echo 'MongoDB is ready! Configuring replica set...' &&
+      mongosh --host mongodb:27017 --eval 'try { rs.initiate({_id:\"rs0\",members:[{_id:0,host:\"mongodb:27017\"}]}) } catch(e) { print(\"Replica already active\") }'
+      "
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: food-delivery-redis
+    ports:
+      - "6379:6379"
+    networks:
+      delivery_net:
+        aliases:
+          - redis
+
+  api-gateway:
+    build: ./api-gateway
+    container_name: food-delivery-gateway
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - JWT_SECRET=super_secret_delivery_key_2026
+      - REDIS_URL=redis://redis:6379
+      - USER_SERVICE_URL=http://user-catalog-service:8001
+      - ORDER_SERVICE_URL=http://order-service:8002
+      - KITCHEN_SERVICE_URL=http://kitchen-delivery-service:8003
+    volumes:
+      - shared_uploads:/api-gateway/uploads
+    depends_on:
+      - user-catalog-service
+      - order-service
+      - kitchen-delivery-service
+      - redis
+    networks:
+      - delivery_net
+
+  # ВИПРАВЛЕНО: Усі відступи тепер рівно по 4 пробіли (стандарт YAML)
+  user-catalog-service:
+    build: ./user-catalog-service
+    container_name: food-delivery-user-service
+    ports:
+      - "8001:8001"
+    environment:
+      - PORT=8001
+      - MONGO_URI=mongodb://mongodb:27017/delivery_users?replicaSet=rs0
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=super_secret_delivery_key_2026
+      - JWT_REFRESH_SECRET=super_secret_refresh_key_2026
+    volumes:
+      - shared_uploads:/user-catalog-service/uploads
+    depends_on:
+      mongodb:
+        condition: service_started
+      mongodb-setup:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+    networks:
+      - delivery_net
+
+  order-service:
+    build: ./order-service
+    container_name: food-delivery-order-service
+    ports:
+      - "8002:8002"
+    environment:
+      - PORT=8002
+      - MONGO_URI=mongodb://mongodb:27017/delivery_orders?replicaSet=rs0
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      mongodb:
+        condition: service_started
+      mongodb-setup:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+    networks:
+      - delivery_net
+
+  kitchen-delivery-service:
+    build: ./kitchen-delivery-service
+    container_name: food-delivery-kitchen-service
+    ports:
+      - "8003:8003"
+    environment:
+      - PORT=8003
+      - MONGO_URI=mongodb://mongodb:27017/delivery_kitchen?replicaSet=rs0
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - shared_uploads:/kitchen-delivery-service/uploads 
+    depends_on:
+      mongodb:
+        condition: service_started
+      mongodb-setup:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+    networks:
+      - delivery_net
+
+  frontend:
+    build: ./frontend
+    container_name: food-delivery-frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - PORT=5173
+    depends_on:
+      - api-gateway
+    networks:
+      - delivery_net
+
+networks:
+  delivery_net:
+    driver: bridge
+
+volumes:
+  mongo_data:
+  shared_uploads:
