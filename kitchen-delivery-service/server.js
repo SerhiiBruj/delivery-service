@@ -23,7 +23,7 @@ const mailTransport = nodemailer.createTransport({
   port: parseInt(process.env.SMTP_PORT || "2525"),
   auth: {
     user: process.env.SMTP_USER || "serhiispidey07@gmail.com",
-    pass: process.env.SMTP_PASS || "FreshBoy56"
+    pass: process.env.SMTP_PASS || ""
   }
 });
 
