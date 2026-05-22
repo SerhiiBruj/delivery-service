@@ -1,0 +1,119 @@
+openapi: 3.0.3
+info:
+  title: Food Delivery System API
+  description: API для управління користувачами, каталогом ресторанів та замовленнями.
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8000
+    description: API Gateway server
+
+tags:
+  - name: Auth
+    description: Реєстрація та автентифікація
+  - name: Catalog
+    description: Меню та ресторани
+  - name: Orders
+    description: Керування замовленнями
+  - name: Kitchen
+    description: Виконання замовлень (Kitchen/Delivery)
+
+paths:
+  /api/v1/users/register:
+    post:
+      tags: [Auth]
+      summary: Реєстрація користувача
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        "201":
+          description: Користувач створений успішно
+  
+  /api/v1/catalog:
+    get:
+      tags: [Catalog]
+      summary: Отримання списку ресторанів
+      parameters:
+        - name: cuisine
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Список ресторанів
+  
+  /api/v1/orders:
+    post:
+      tags: [Orders]
+      summary: Створення замовлення
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderRequest'
+      responses:
+        "201":
+          description: Замовлення успішно створено
+  
+  /api/v1/kitchen/tickets/{orderId}/status:
+    patch:
+      tags: [Kitchen]
+      summary: Оновлення статусу замовлення
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [READY_FOR_PICKUP, PICKED_UP, DELIVERED]
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [email, password, name, phone]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string }
+        name: { type: string }
+        phone: { type: string }
+        role: { type: string, enum: [Customer, Restaurant Manager, Courier] }
+
+    OrderRequest:
+      type: object
+      required: [items, restaurantId, deliveryAddress]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              price: { type: number }
+              quantity: { type: integer }
+        restaurantId: { type: string }
+        deliveryAddress: { type: string }
+        paymentMethod: { type: string, enum: [CARD, CASH] }
