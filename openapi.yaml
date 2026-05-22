@@ -1,24 +1,25 @@
 openapi: 3.0.3
+
 info:
   title: Food Delivery System API
-  description: API для управління користувачами, каталогом ресторанів та замовленнями.
+  description: API для управління користувачами, каталогом ресторанів, кошиком та доставкою.
   version: 1.0.0
 
 servers:
   - url: http://localhost:8000
-    description: API Gateway server
+    description: API Gateway
 
 tags:
   - name: Auth
-    description: Реєстрація та автентифікація
+  - name: Users
   - name: Catalog
-    description: Меню та ресторани
+  - name: Cart
   - name: Orders
-    description: Керування замовленнями
   - name: Kitchen
-    description: Виконання замовлень (Kitchen/Delivery)
+  - name: Delivery
 
 paths:
+
   /api/v1/users/register:
     post:
       tags: [Auth]
@@ -31,12 +32,89 @@ paths:
               $ref: '#/components/schemas/RegisterRequest'
       responses:
         "201":
-          description: Користувач створений успішно
-  
+          description: Користувача створено
+
+  /api/v1/users/login:
+    post:
+      tags: [Auth]
+      summary: Авторизація користувача
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        "200":
+          description: JWT токени
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+
+  /api/v1/users/refresh:
+    post:
+      tags: [Auth]
+      summary: Оновлення access token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        "200":
+          description: Нові токени
+
+  /api/v1/users/address:
+    get:
+      tags: [Users]
+      summary: Отримання адрес користувача
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Список адрес
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Address'
+
+    post:
+      tags: [Users]
+      summary: Додавання адреси
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddressRequest'
+      responses:
+        "201":
+          description: Адреса створена
+
+  /api/v1/users/profile:
+    delete:
+      tags: [Users]
+      summary: Видалення профілю
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Профіль видалено
+
   /api/v1/catalog:
     get:
       tags: [Catalog]
-      summary: Отримання списку ресторанів
+      summary: Отримання каталогу ресторанів
       parameters:
         - name: cuisine
           in: query
@@ -44,14 +122,92 @@ paths:
             type: string
       responses:
         "200":
-          description: Список ресторанів
-  
+          description: Каталог ресторанів
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Restaurant'
+
+  /api/v1/catalog/menu:
+    post:
+      tags: [Catalog]
+      summary: Створення або оновлення меню ресторану
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                restaurantId:
+                  type: string
+                restaurantName:
+                  type: string
+                cuisine:
+                  type: string
+                menuItems:
+                  type: string
+                  description: JSON stringified array
+                logo:
+                  type: string
+                  format: binary
+                dishImage:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Меню оновлено
+
+  /api/v1/cart:
+    post:
+      tags: [Cart]
+      summary: Збереження кошика
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CartRequest'
+      responses:
+        "200":
+          description: Кошик оновлено
+
+    get:
+      tags: [Cart]
+      summary: Отримання кошика
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Дані кошика
+
+    delete:
+      tags: [Cart]
+      summary: Очистити кошик
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Кошик очищено
+
   /api/v1/orders:
     post:
       tags: [Orders]
       summary: Створення замовлення
       security:
         - BearerAuth: []
+      parameters:
+        - in: header
+          name: x-idempotency-key
+          required: false
+          schema:
+            type: string
       requestBody:
         required: true
         content:
@@ -60,8 +216,44 @@ paths:
               $ref: '#/components/schemas/OrderRequest'
       responses:
         "201":
-          description: Замовлення успішно створено
-  
+          description: Замовлення створено
+
+  /api/v1/orders/customer:
+    get:
+      tags: [Orders]
+      summary: Історія замовлень користувача
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Список замовлень
+
+  /api/v1/orders/track/{orderId}:
+    get:
+      tags: [Orders]
+      summary: Трекінг замовлення
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Інформація про замовлення
+
+  /api/v1/kitchen/tickets:
+    get:
+      tags: [Kitchen]
+      summary: Список kitchen tickets
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Kitchen tickets
+
   /api/v1/kitchen/tickets/{orderId}/status:
     patch:
       tags: [Kitchen]
@@ -75,16 +267,35 @@ paths:
           schema:
             type: string
       requestBody:
+        required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                status:
-                  type: string
-                  enum: [READY_FOR_PICKUP, PICKED_UP, DELIVERED]
+              $ref: '#/components/schemas/StatusUpdateRequest'
+      responses:
+        "200":
+          description: Статус оновлено
+
+  /api/v1/delivery/available-tickets:
+    get:
+      tags: [Delivery]
+      summary: Доступні замовлення для кур'єра
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Список доступних доставок
+
+  /health:
+    get:
+      tags: [System]
+      summary: Health check
+      responses:
+        "200":
+          description: Service is UP
 
 components:
+
   securitySchemes:
     BearerAuth:
       type: http
@@ -92,28 +303,220 @@ components:
       bearerFormat: JWT
 
   schemas:
+
     RegisterRequest:
       type: object
-      required: [email, password, name, phone]
+      required:
+        - email
+        - password
+        - name
+        - phone
       properties:
-        email: { type: string, format: email }
-        password: { type: string }
-        name: { type: string }
-        phone: { type: string }
-        role: { type: string, enum: [Customer, Restaurant Manager, Courier] }
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+        name:
+          type: string
+        phone:
+          type: string
+        role:
+          type: string
+          enum:
+            - Customer
+            - Restaurant Manager
+            - Courier
+            - admin
+        restaurantName:
+          type: string
+        cuisine:
+          type: string
+        street:
+          type: string
+        city:
+          type: string
+        postalCode:
+          type: string
 
-    OrderRequest:
+    LoginRequest:
       type: object
-      required: [items, restaurantId, deliveryAddress]
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+
+    LoginResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        user:
+          $ref: '#/components/schemas/User'
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        name:
+          type: string
+        phone:
+          type: string
+        role:
+          type: string
+
+    Address:
+      type: object
+      properties:
+        id:
+          type: string
+        street:
+          type: string
+        city:
+          type: string
+        postalCode:
+          type: string
+        isDefault:
+          type: boolean
+
+    AddressRequest:
+      type: object
+      required:
+        - street
+        - city
+        - postalCode
+      properties:
+        street:
+          type: string
+        city:
+          type: string
+        postalCode:
+          type: string
+        isDefault:
+          type: boolean
+
+    Restaurant:
+      type: object
+      properties:
+        restaurantId:
+          type: string
+        name:
+          type: string
+        cuisine:
+          type: string
+        address:
+          type: string
+        logoUrl:
+          type: string
+        menu:
+          type: array
+          items:
+            $ref: '#/components/schemas/MenuItem'
+
+    MenuItem:
+      type: object
+      properties:
+        dishId:
+          type: string
+        name:
+          type: string
+        price:
+          type: number
+        imageUrl:
+          type: string
+        available:
+          type: boolean
+
+    CartRequest:
+      type: object
+      required:
+        - items
       properties:
         items:
           type: array
           items:
-            type: object
-            properties:
-              id: { type: string }
-              price: { type: number }
-              quantity: { type: integer }
-        restaurantId: { type: string }
-        deliveryAddress: { type: string }
-        paymentMethod: { type: string, enum: [CARD, CASH] }
+            $ref: '#/components/schemas/OrderItem'
+
+    OrderRequest:
+      type: object
+      required:
+        - items
+        - restaurantId
+        - restaurantName
+        - deliveryAddress
+        - deliveryCoords
+        - restaurantCoords
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        restaurantId:
+          type: string
+        restaurantName:
+          type: string
+        restaurantAddress:
+          type: string
+        deliveryAddress:
+          type: string
+        paymentMethod:
+          type: string
+          enum:
+            - CARD
+            - CASH
+        paymentCardMock:
+          type: object
+          properties:
+            cardNumber:
+              type: string
+            cvv:
+              type: string
+        restaurantCoords:
+          $ref: '#/components/schemas/Coords'
+        deliveryCoords:
+          $ref: '#/components/schemas/Coords'
+
+    OrderItem:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        price:
+          type: number
+        quantity:
+          type: integer
+        imageUrl:
+          type: string
+
+    Coords:
+      type: object
+      properties:
+        lat:
+          type: number
+        lng:
+          type: number
+
+    StatusUpdateRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - READY_FOR_PICKUP
+            - PICKED_UP
+            - DELIVERED
+        estimatedPreparingTime:
+          type: integer
+        estimatedDeliveryTime:
+          type: integer
