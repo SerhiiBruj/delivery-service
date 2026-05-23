@@ -36,7 +36,6 @@ const log = (msg) => console.log(JSON.stringify({ timestamp: new Date().toISOStr
 
 app.get('/health', (req, res) => res.status(200).json({ status: "UP" }));
 
-// --- СХЕМИ ДАНИХ ---
 
 const catalogSchema = new mongoose.Schema({
   restaurantId: { type: String, required: true, unique: true, index: true },
@@ -56,9 +55,7 @@ const kitchenTicketSchema = new mongoose.Schema({
   orderId: { type: String, required: true, unique: true, index: true },
   restaurantId: { type: String, required: true },
   restaurantName: { type: String, required: true },
-  // МОДЕРНІЗАЦІЯ: Нове поле для збереження адреси ресторану (пікапу)
   restaurantAddress: { type: String, default: null },
-  // МОДЕРНІЗАЦІЯ: Нове поле для збереження відстані між точками
   distanceKm: { type: Number, default: null },
   items: [{
     name: { type: String, required: true },

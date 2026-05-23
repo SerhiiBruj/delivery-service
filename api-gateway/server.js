@@ -87,7 +87,7 @@ const publicRoutes = [
   '/api/v1/users/login', 
   '/api/v1/users/refresh', 
   '/api/v1/catalog',
-  '/uploads' // Відкриваємо публічний доступ до картинок ресторанів
+  '/uploads' 
 ];
 
 const authenticateToken = (req, res, next) => {

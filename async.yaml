@@ -1,0 +1,252 @@
+asyncapi: 2.6.0
+
+info:
+  title: Food Delivery Event-Driven System
+  version: 1.0.0
+  description: |
+    AsyncAPI специфікація для event-driven архітектури системи доставки їжі.
+    Використовується Redis Pub/Sub для асинхронної комунікації між мікросервісами.
+
+defaultContentType: application/json
+
+servers:
+  redisBroker:
+    url: redis://localhost:6379
+    protocol: redis
+    description: Redis Pub/Sub Broker
+
+channels:
+
+  order.paid:
+    description: Подія успішної оплати замовлення
+    publish:
+      summary: Order Service публікує підтверджене замовлення
+      operationId: publishPaidOrder
+      message:
+        $ref: '#/components/messages/OrderPaidEvent'
+
+    subscribe:
+      summary: Kitchen Service отримує нові оплачені замовлення
+      operationId: consumePaidOrder
+      message:
+        $ref: '#/components/messages/OrderPaidEvent'
+
+  order.status_update:
+    description: Оновлення статусу замовлення
+    publish:
+      summary: Kitchen Service оновлює статус замовлення
+      operationId: publishOrderStatusUpdate
+      message:
+        $ref: '#/components/messages/OrderStatusUpdatedEvent'
+
+    subscribe:
+      summary: Order Service синхронізує статус замовлення
+      operationId: consumeOrderStatusUpdate
+      message:
+        $ref: '#/components/messages/OrderStatusUpdatedEvent'
+
+  delivery.courier_broadcast:
+    description: Сповіщення курʼєрам про доступні доставки
+    publish:
+      summary: Kitchen Service розсилає доступні замовлення
+      operationId: publishCourierBroadcast
+      message:
+        $ref: '#/components/messages/CourierBroadcastEvent'
+
+    subscribe:
+      summary: Courier apps підписуються на нові доставки
+      operationId: consumeCourierBroadcast
+      message:
+        $ref: '#/components/messages/CourierBroadcastEvent'
+
+  notification.email.delivery:
+    description: Асинхронне email повідомлення про доставку
+    publish:
+      summary: Kitchen Service ініціює email повідомлення
+      operationId: publishDeliveryEmail
+      message:
+        $ref: '#/components/messages/DeliveryEmailEvent'
+
+    subscribe:
+      summary: Notification Service відправляє email
+      operationId: consumeDeliveryEmail
+      message:
+        $ref: '#/components/messages/DeliveryEmailEvent'
+
+components:
+
+  messages:
+
+    OrderPaidEvent:
+      name: OrderPaidEvent
+      title: Paid Order Event
+      summary: Подія успішної оплати замовлення
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/OrderPaidPayload'
+
+    OrderStatusUpdatedEvent:
+      name: OrderStatusUpdatedEvent
+      title: Order Status Updated
+      summary: Подія оновлення статусу замовлення
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/OrderStatusUpdatedPayload'
+
+    CourierBroadcastEvent:
+      name: CourierBroadcastEvent
+      title: Courier Delivery Broadcast
+      summary: Подія сповіщення курʼєрів
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/CourierBroadcastPayload'
+
+    DeliveryEmailEvent:
+      name: DeliveryEmailEvent
+      title: Delivery Notification Email
+      summary: Подія email повідомлення про доставку
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/DeliveryEmailPayload'
+
+  schemas:
+
+    OrderPaidPayload:
+      type: object
+      required:
+        - orderId
+        - restaurantId
+        - restaurantName
+        - items
+        - deliveryAddress
+      properties:
+        orderId:
+          type: string
+          example: "6830af21bc9120d412c44111"
+
+        restaurantId:
+          type: string
+          example: "rest_991"
+
+        restaurantName:
+          type: string
+          example: "Pizzeria Paradiso"
+
+        restaurantAddress:
+          type: string
+          example: "Main Street 21, Kyiv"
+
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+
+        deliveryAddress:
+          type: string
+          example: "Shevchenko Ave 14"
+
+        distanceKm:
+          type: number
+          example: 5.7
+
+        customerEmail:
+          type: string
+          format: email
+          example: "customer@example.com"
+
+    OrderStatusUpdatedPayload:
+      type: object
+      required:
+        - orderId
+        - status
+      properties:
+        orderId:
+          type: string
+
+        status:
+          type: string
+          enum:
+            - PREPARING
+            - READY_FOR_PICKUP
+            - PICKED_UP
+            - DELIVERED
+
+        courierId:
+          type: string
+          nullable: true
+
+        estimatedPreparingTime:
+          type: integer
+          example: 15
+
+        estimatedDeliveryTime:
+          type: integer
+          example: 20
+
+    CourierBroadcastPayload:
+      type: object
+      required:
+        - orderId
+        - restaurantId
+        - restaurantName
+        - deliveryAddress
+      properties:
+        orderId:
+          type: string
+
+        restaurantId:
+          type: string
+
+        restaurantName:
+          type: string
+
+        restaurantAddress:
+          type: string
+
+        distanceKm:
+          type: number
+
+        deliveryAddress:
+          type: string
+
+        estimatedPreparingTime:
+          type: integer
+
+    DeliveryEmailPayload:
+      type: object
+      required:
+        - customerEmail
+        - orderId
+      properties:
+        customerEmail:
+          type: string
+          format: email
+
+        orderId:
+          type: string
+
+        subject:
+          type: string
+          example: "Ваше замовлення доставлено"
+
+        text:
+          type: string
+          example: "Ваше замовлення успішно доставлено"
+
+    OrderItem:
+      type: object
+      properties:
+        id:
+          type: string
+
+        name:
+          type: string
+
+        quantity:
+          type: integer
+
+        price:
+          type: number
+
+        imageUrl:
+          type: string
